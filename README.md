@@ -1,4 +1,4 @@
-# basic-password-manager
+# Basic Password Manager
 
 ## Description
 
