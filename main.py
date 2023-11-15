@@ -4,10 +4,7 @@ from PyQt5.QtGui import QGuiApplication
 
 from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
-from Crypto.Random import get_random_bytes
 import base64
-
-import hashlib
 
 import os
 
@@ -34,8 +31,6 @@ class MyApp(QWidget):
         self.resize(256, 64)
 
         self.key = None  # Initialize a variable to store the encryption key
-        
-        self.passwords = [[]]
 
         self.FILE_PATH = 'neddih.txt'
 
@@ -72,7 +67,7 @@ class MyApp(QWidget):
         screen = QWidget()
         layout = QVBoxLayout(screen)
 
-        add_button = self.create_button("Add", self.switch_to_add_screen)
+        add_button = self.create_button("Add", self.switch_to_add_screen, 64)
         self.search_input = QLineEdit()
         search_button = self.create_button("Search", self.search, 64)
         self.list_widget = CustomListWidget()
@@ -160,9 +155,7 @@ class MyApp(QWidget):
         input_data = []
 
         # Append data from the top permanent input
-        top_input_data = self.top_input.text()
-        if top_input_data:
-            input_data.append('\n' + top_input_data)
+        input_data.append(self.top_input.text())
 
         # Append data from dynamically added input fields
         for input_field in self.input_fields:
@@ -171,25 +164,10 @@ class MyApp(QWidget):
                 input_data.append(field_data)
 
         # Append data from the bottom permanent input
-        bottom_input_data = self.bottom_input.text()
-        if bottom_input_data:
-            input_data.append(bottom_input_data)
+        input_data.append(self.bottom_input.text())
 
-        # Encrypt the data
-        encrypted_data = self.encrypt_data(input_data.join())
-
-        # Check if there's any data to append
-        if encrypted_data:
-            file_path = "neddih.txt"
-
-            # Opening the file in append mode
-            with open(file_path, 'a') as file:
-
-                # Appending the text to the file
-                if os.path.getsize(file_path) == 0:
-                    file.write(encrypted_data[0] + ':' + encrypted_data[1])  # Adding the first password to the file
-                else:
-                    file.write(';' + encrypted_data[0] + ':' + encrypted_data[1])  # Adding the remaining passwords to the file
+        # Append data to file
+        self.add_service(input_data)
 
         # Refresh the list widget to show the updated data
         self.refresh_list_widget()
@@ -208,8 +186,24 @@ class MyApp(QWidget):
             input_to_remove = self.input_fields.pop()
             input_to_remove.deleteLater()
 
+    def add_service(self, data):
+        # Encrypt the data
+        encrypted_data = self.encrypt_data('\n'.join(data))
+
+        # Check if there's any data to append
+        if encrypted_data:
+
+            # Opening the file in append mode
+            with open(self.FILE_PATH, 'a') as file:
+
+                # Appending the text to the file
+                if os.path.getsize(self.FILE_PATH) == 0:
+                    file.write(encrypted_data[0] + ':' + encrypted_data[1])  # Adding the first password to the file
+                else:
+                    file.write(';' + encrypted_data[0] + ':' + encrypted_data[1])  # Adding the remaining passwords to the file
+
     def refresh_list_widget(self):
-        # Validate the PIN input for decryption key
+        # Check if a PIN has been inputted
         if not self.key:
             return
         
@@ -217,29 +211,29 @@ class MyApp(QWidget):
         with open(self.FILE_PATH, 'r') as file:
             encrypted_data = file.read()
 
+        # Check if the file is empty
         if encrypted_data == '':
             return
+        
+        passwords = [[]]
 
-        print(encrypted_data == '')
-
+        # Fill passwords list with decrypted data
         for item in encrypted_data.split(';'):
             print(self.decrypt_data(item.split(':')[0], item.split(':')[1]).split('\n'))
-            self.passwords.append(self.decrypt_data(item.split(':')[0], item.split(':')[1]).split())
+            passwords.append(self.decrypt_data(item.split(':')[0], item.split(':')[1]).split('\n'))
 
-        
+        self.list_widget.clear()
 
-        # # Validate the PIN input for decryption key
-        # if not self.aes_key:
-        #     return
+        # Add passwords to list_widget
+        for service in passwords:
+            i = 0
+            for field in service:
+                if i == 0:
+                    self.list_widget.addItem(field) # Service
+                else:
+                    self.list_widget.addItem('    ' + field) # Field is indented for clarity
 
-        # try:
-        #     decrypted_data = self.aes_decrypt(encrypted_data, self.aes_key)
-        # except Exception as e:
-        #     print(f"Decryption failed: {e}")
-        #     return
-
-        # Process decrypted data to structured_data format
-        # self.update_list_widget(self.list_widget, encrypted_data)
+                i += 1
 
     def create_button(self, text, function, fixed_width=None):
         button = QPushButton(text)
@@ -287,32 +281,6 @@ class MyApp(QWidget):
         with open(file_path, 'r') as file:
             return file.readlines()
         
-    def update_list_widget(self, list_widget, structured_data):
-        list_widget.clear()
-        last_item = None
-
-        print(structured_data)
-        
-        for item, field in structured_data:
-            if item != last_item:
-                list_widget.addItem(item)  # Add the main item
-                last_item = item
-            list_widget.addItem(f"  {field}")  # Add the field, indented for clarity
-
-        structured_data = []
-        current_item = None
-
-        for line in data:
-            line = line.strip()
-            if line:  # Check if line is not empty
-                if current_item is None:
-                    current_item = line
-                else:
-                    structured_data.append((current_item, line))
-            else:
-                current_item = None  # Reset for the next item
-        return structured_data
-
     def derive_key(self, pin):
         # Derive a 256-bit key using the provided pin
         salt = b'\x00'*16  # Static salt; in a real-world scenario, use a random salt
