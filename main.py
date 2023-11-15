@@ -276,10 +276,6 @@ class MyApp(QWidget):
     def search(self):
         # Implement search functionality here
         pass
-
-    def read_from_file(self, file_path):
-        with open(file_path, 'r') as file:
-            return file.readlines()
         
     def derive_key(self, pin):
         # Derive a 256-bit key using the provided pin
