@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QListWidget, QLabel
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QListWidget, QLabel, QFileDialog
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QGuiApplication
 
@@ -34,6 +34,9 @@ class MyApp(QWidget):
 
         self.FILE_PATH = 'neddih.txt'
 
+        self.imported = False
+        self.imported_data = None
+
         self.init_ui()
 
     def init_ui(self):
@@ -56,9 +59,16 @@ class MyApp(QWidget):
         screen = QWidget()
         layout = QVBoxLayout(screen)
 
-        self.text_input = QLineEdit()
-        submit_button = self.create_button("Go", lambda: self.submit_input_screen(), 64)
+        import_button = QPushButton('Import')
+        import_button.setFixedWidth(64)
+        import_button.clicked.connect(self.import_from_file)
+        self.import_label = QLabel('')
 
+        self.text_input = QLineEdit()
+        submit_button = self.create_button("Go", self.submit_input_screen, 64)
+
+        layout.addLayout(self.create_hbox_layout(import_button))
+        layout.addWidget(self.import_label)
         layout.addWidget(self.text_input)
         layout.addLayout(self.create_hbox_layout(submit_button))
         return screen
@@ -82,7 +92,7 @@ class MyApp(QWidget):
 
     def create_add_screen(self):
         screen = QWidget()
-        layout = QVBoxLayout(screen)
+        self.add_screen_layout = QVBoxLayout(screen)
 
         self.error_label = QLabel()
         self.error_label.setStyleSheet("color: red;")
@@ -96,11 +106,11 @@ class MyApp(QWidget):
         self.bottom_input = QLineEdit()
         self.input_fields = []
 
-        layout.addWidget(self.error_label)
-        layout.addLayout(self.create_hbox_layout(back_button, stretch=True))
-        layout.addWidget(self.top_input)
-        layout.addLayout(self.create_hbox_layout(add_field_button, remove_field_button, submit_button))
-        layout.addWidget(self.bottom_input)
+        self.add_screen_layout.addWidget(self.error_label)
+        self.add_screen_layout.addLayout(self.create_hbox_layout(back_button, stretch=True))
+        self.add_screen_layout.addWidget(self.top_input)
+        self.add_screen_layout.addLayout(self.create_hbox_layout(add_field_button, remove_field_button, submit_button))
+        self.add_screen_layout.addWidget(self.bottom_input)
 
         return screen
 
@@ -135,6 +145,9 @@ class MyApp(QWidget):
         if pin_input.isdigit() and len(pin_input) == 4:
             self.key = self.derive_key(pin_input)
 
+        if self.imported and len(self.imported_data) > 0:
+            self.export_to_file()
+
         # Refresh the list widget to show the updated data
         self.refresh_list_widget()
 
@@ -155,7 +168,7 @@ class MyApp(QWidget):
         input_data = []
 
         # Append data from the top permanent input
-        input_data.append(self.top_input.text())
+        input_data.append(self.top_input.text().lower())
 
         # Append data from dynamically added input fields
         for input_field in self.input_fields:
@@ -178,7 +191,7 @@ class MyApp(QWidget):
     def add_input_field(self):
         new_input = QLineEdit()
         # Insert the new input field above the bottom input
-        self.layout.addWidget(self.add_layout.count() - 1, new_input)
+        self.add_screen_layout.insertWidget(self.add_screen_layout.count() - 1, new_input)
         self.input_fields.append(new_input)
 
     def remove_input_field(self):
@@ -189,6 +202,8 @@ class MyApp(QWidget):
     def add_service(self, data):
         # Encrypt the data
         encrypted_data = self.encrypt_data('\n'.join(data))
+
+        print(data)
 
         # Check if there's any data to append
         if encrypted_data:
@@ -219,7 +234,6 @@ class MyApp(QWidget):
 
         # Fill passwords list with decrypted data
         for item in encrypted_data.split(';'):
-            print(self.decrypt_data(item.split(':')[0], item.split(':')[1]).split('\n'))
             passwords.append(self.decrypt_data(item.split(':')[0], item.split(':')[1]).split('\n'))
 
         self.list_widget.clear()
@@ -316,6 +330,41 @@ class MyApp(QWidget):
         pt = pt[:-pad]
 
         return pt.decode('utf-8')
+
+    def import_from_file(self):
+        # Open file dialog and get the selected file path
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select File")
+        
+        if file_path:  # If a file was selected
+            data = {}
+            current_service = None
+
+            with open(file_path, 'r') as file:
+                for line in file:
+                    line = line.strip()  # Remove any leading/trailing whitespace
+                    if ' - ' in line:
+                        # This line contains a field-attribute pair
+                        field, attribute = line.split(' - ', 1)
+                        if current_service is not None:
+                            data[current_service][field] = attribute
+                    else:
+                        # This line is a service name
+                        current_service = line
+                        data[current_service] = {}
+
+                self.imported = True
+
+                self.import_label.setText('Choose a master password to access and store all of your passwords.\nPlease write this password down somewhere and don\'t lose it.')
+
+                self.imported_data = data
+
+    def export_to_file(self):
+        for outer_key, inner_dict in self.imported_data.items():
+            sublist = [outer_key]
+            for inner_key, inner_value in inner_dict.items():
+                sublist.append(f'{inner_key} : {inner_value}')
+            if not(len(sublist) == 1 and sublist[0] == ''):
+                self.add_service(sublist)
 
 if __name__ == "__main__":
     app = QApplication([])
