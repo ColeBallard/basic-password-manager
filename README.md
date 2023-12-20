@@ -60,7 +60,7 @@ attribute - value
 attribute - value
 ```
 
-2. Ensure that between each attribute and value is the string ` - ` and between each service group is a new line.
+2. Ensure that between each attribute and value is a dash with spaces around it and between each service group is a new line.
 
 3. Save the text file, then run **main.exe**.
 
