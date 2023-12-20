@@ -1,4 +1,7 @@
 *.txt
+*.spec
+*.zip
+
 /build
 /dist
-*.spec
+/sdrowssap
