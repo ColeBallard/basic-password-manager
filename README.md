@@ -6,7 +6,7 @@ Basic password management tool for storing and retrieving encrypted passwords.
 
 ## Features
 
-- simple window UI (User Interface)
+- simple window UI (User Interface) that hides password values
 - add and search for passwords
 - automatically add passwords to clipboard by clicking on the designated row in the password list
 - import text file of passwords
@@ -38,7 +38,9 @@ To install and use this app:
 
 11. Click submit once you've finished creating your service and all your attribute/values.
 
-12. Scroll through the list of your passwords and click on a row to copy its value.
+12. In the text box above the Search button, type in the service you want to find and press the Search button.
+
+13. To copy the value to your clipboard, click the row where the attribute and value is at.
 
 ## Import Text File
 
@@ -68,7 +70,9 @@ attribute - value
 
 5. Enter a master password in the text box and press Go.
 
-6. Scroll through the list of your passwords and click on a row to copy its value.
+6. In the text box above the Search button, type in the service you want to find and press the Search button.
+
+7. To copy the value to your clipboard, click the row where the attribute and value is at.
 
 ## Contribution
 
