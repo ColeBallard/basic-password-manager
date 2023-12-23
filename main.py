@@ -1,6 +1,5 @@
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QListWidget, QLabel, QFileDialog
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QListWidget, QListWidgetItem, QLabel, QFileDialog, QMessageBox
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QGuiApplication
 
 from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
@@ -12,17 +11,31 @@ class CustomListWidget(QListWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-    def mouseReleaseEvent(self, event):
-        super().mouseReleaseEvent(event)
+    def mousePressEvent(self, event):
+        super().mousePressEvent(event)
         if event.button() == Qt.LeftButton:
-            self.copy_field_to_clipboard()
+            item = self.currentItem()
+            if item and isinstance(item, CustomListItem) and item.type == 'attribute':
+                QApplication.clipboard().setText(item.getActualValue())
+                QMessageBox.information(self, "Copied", "Value copied to clipboard.")
 
-    def copy_field_to_clipboard(self):
-        item = self.currentItem()
-        if item and ':' in item.text():
-            clipboard = QGuiApplication.clipboard()
-            field_text = item.text().split(':', 1)[1].strip()
-            clipboard.setText(field_text)
+class CustomListItem(QListWidgetItem):
+    def __init__(self, type, text, parent=None):
+        super().__init__(parent)
+        self.type = type  # 'service' or 'attribute'
+        self.full_text = text
+        self.actual_value = ""
+
+        if type == 'attribute':
+            attr, value = text.split(':')
+            self.actual_value = value.strip()
+            masked_value = '*' * len(self.actual_value)
+            self.setText(f"{attr}: {masked_value}")
+        else:
+            self.setText(text)
+
+    def getActualValue(self):
+        return self.actual_value
 
 class MyApp(QWidget):
     def __init__(self):
@@ -36,6 +49,8 @@ class MyApp(QWidget):
 
         self.imported = False
         self.imported_data = None
+
+        self.secret_data = {}
 
         self.init_ui()
 
@@ -65,7 +80,10 @@ class MyApp(QWidget):
         self.import_label = QLabel('')
 
         self.text_input = QLineEdit()
+        self.text_input.setEchoMode(QLineEdit.Password)
         submit_button = self.create_button("Go", self.submit_input_screen, 64)
+
+        self.text_input.returnPressed.connect(self.submit_input_screen)
 
         layout.addLayout(self.create_hbox_layout(import_button))
         layout.addWidget(self.import_label)
@@ -81,6 +99,8 @@ class MyApp(QWidget):
         self.search_input = QLineEdit()
         search_button = self.create_button("Search", self.search, 64)
         self.list_widget = CustomListWidget()
+
+        self.search_input.returnPressed.connect(self.search)
 
         layout.addLayout(self.create_hbox_layout(add_button))
         layout.addWidget(self.search_input)
@@ -115,15 +135,14 @@ class MyApp(QWidget):
         return screen
 
     def switch_to_search_screen(self):
-        user_input = self.text_input.text()
         self.input_screen.hide()
         self.search_screen.show()
         self.add_screen.hide()
 
         # Resize the window if necessary
-        self.resize(256, 64)
+        self.resize(512, 512)
 
-        # Optional: Clear the text input fields on the add screen
+        # Clear the text input fields on the add screen
         self.top_input.clear()
         self.bottom_input.clear()
         for field in self.input_fields:
@@ -141,9 +160,7 @@ class MyApp(QWidget):
         # Retrieve the PIN input
         pin_input = self.text_input.text()
 
-        # Validate the PIN input
-        if pin_input.isdigit() and len(pin_input) == 4:
-            self.key = self.derive_key(pin_input)
+        self.key = self.derive_key(pin_input)         
 
         if self.imported and len(self.imported_data) > 0:
             self.export_to_file()
@@ -203,8 +220,6 @@ class MyApp(QWidget):
         # Encrypt the data
         encrypted_data = self.encrypt_data('\n'.join(data))
 
-        print(data)
-
         # Check if there's any data to append
         if encrypted_data:
 
@@ -218,36 +233,29 @@ class MyApp(QWidget):
                     file.write(';' + encrypted_data[0] + ':' + encrypted_data[1])  # Adding the remaining passwords to the file
 
     def refresh_list_widget(self):
-        # Check if a PIN has been inputted
         if not self.key:
             return
-        
+
         # Read encrypted data from the file
         with open(self.FILE_PATH, 'r') as file:
             encrypted_data = file.read()
 
-        # Check if the file is empty
         if encrypted_data == '':
             return
-        
-        passwords = [[]]
 
-        # Fill passwords list with decrypted data
+        # Process and decrypt data into the structured format
         for item in encrypted_data.split(';'):
-            passwords.append(self.decrypt_data(item.split(':')[0], item.split(':')[1]).split('\n'))
+            service_data = self.decrypt_data(item.split(':')[0], item.split(':')[1]).split('\n')
+            service_name = service_data[0]
+            self.secret_data[service_name] = service_data[1:]
 
         self.list_widget.clear()
 
-        # Add passwords to list_widget
-        for service in passwords:
-            i = 0
-            for field in service:
-                if i == 0:
-                    self.list_widget.addItem(field) # Service
-                else:
-                    self.list_widget.addItem('    ' + field) # Field is indented for clarity
-
-                i += 1
+        for service in sorted(self.secret_data.keys()):
+            attributes = self.secret_data[service]
+            self.list_widget.addItem(CustomListItem('service', service))  # Add matching service
+            for attr in attributes:
+                self.list_widget.addItem(CustomListItem('attribute', '    ' + attr))  # Add masked attributes
 
     def create_button(self, text, function, fixed_width=None):
         button = QPushButton(text)
@@ -288,9 +296,16 @@ class MyApp(QWidget):
         self.add_screen.hide()
 
     def search(self):
-        # Implement search functionality here
-        pass
-        
+        search_text = self.search_input.text().lower()
+        self.list_widget.clear()  # Clear current list
+
+        for service in sorted(self.secret_data.keys()):
+            if search_text in service.lower():  # Check if search text is in service
+                attributes = self.secret_data[service]
+                self.list_widget.addItem(CustomListItem('service', service))  # Add matching service
+                for attr in attributes:
+                    self.list_widget.addItem(CustomListItem('attribute', '    ' + attr))  # Add masked attributes
+
     def derive_key(self, pin):
         # Derive a 256-bit key using the provided pin
         salt = b'\x00'*16  # Static salt; in a real-world scenario, use a random salt
