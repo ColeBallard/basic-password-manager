@@ -74,6 +74,25 @@ attribute - value
 
 7. To copy the value to your clipboard, click the row where the attribute and value is at.
 
+## Future Features
+
+- button to let user see password values instead of masking them
+  - starts off by default
+- button to let user change master passcode
+  - maintains file with old passcode by duplicating encrypted text file with timestamp
+- button to let user export into a decrypted text file
+- button to let user edit a service/attribute/value
+- when adding a service, split the attribute/value text box into 2 text boxes and automatically create the ' : ' between them
+- more advanced searching
+  - possibly search by attribute name
+- sort by date
+- ensuring uniform font for all text input
+- better labeling for all text inputs
+  - possibly use placeholders
+- better ui
+  - better button layout and space usage
+  - might experiment with using toolbar for all buttons
+
 ## Contribution
 
 If you have an idea or want to report a bug, please create an issue.
