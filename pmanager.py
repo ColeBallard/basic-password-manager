@@ -4,6 +4,9 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLin
 
 from custom_list import CustomListWidget, CustomListItem
 from pcrypt import PCrypt
+from screens.input_screen import InputScreen
+from screens.search_screen import SearchScreen
+from screens.add_screen import AddScreen
 
 class PManager(QWidget):
     def __init__(self):
@@ -23,84 +26,17 @@ class PManager(QWidget):
         self.init_ui()
 
     def init_ui(self):
-        # Main layout
-        self.layout = QVBoxLayout(self)
+        self.input_screen = InputScreen(self.submit_input_screen, self.import_from_file)
+        self.search_screen = SearchScreen(self.switch_to_add_screen, self.search)
+        self.add_screen = AddScreen(self.switch_to_search_screen, self.submit_add_screen, self.add_input_field, self.remove_input_field)
 
-        # Initialize the screens
-        self.input_screen = self.create_input_screen()
-        self.search_screen = self.create_search_screen()
-        self.add_screen = self.create_add_screen()
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.input_screen)
+        layout.addWidget(self.search_screen)
+        layout.addWidget(self.add_screen)
 
-        # Add screens to layout and hide optional screens initially
-        self.layout.addWidget(self.input_screen)
-        self.layout.addWidget(self.search_screen)
-        self.layout.addWidget(self.add_screen)
         self.search_screen.hide()
         self.add_screen.hide()
-
-    def create_input_screen(self):
-        screen = QWidget()
-        layout = QVBoxLayout(screen)
-
-        import_button = QPushButton('Import')
-        import_button.setFixedWidth(64)
-        import_button.clicked.connect(self.import_from_file)
-        self.import_label = QLabel('')
-
-        self.text_input = QLineEdit()
-        self.text_input.setEchoMode(QLineEdit.Password)
-        submit_button = self.create_button("Go", self.submit_input_screen, 64)
-
-        self.text_input.returnPressed.connect(self.submit_input_screen)
-
-        layout.addLayout(self.create_hbox_layout(import_button))
-        layout.addWidget(self.import_label)
-        layout.addWidget(self.text_input)
-        layout.addLayout(self.create_hbox_layout(submit_button))
-        return screen
-
-    def create_search_screen(self):
-        screen = QWidget()
-        layout = QVBoxLayout(screen)
-
-        add_button = self.create_button("Add", self.switch_to_add_screen, 64)
-        self.search_input = QLineEdit()
-        search_button = self.create_button("Search", self.search, 64)
-        self.list_widget = CustomListWidget()
-
-        self.search_input.returnPressed.connect(self.search)
-
-        layout.addLayout(self.create_hbox_layout(add_button))
-        layout.addWidget(self.search_input)
-        layout.addLayout(self.create_hbox_layout(search_button))
-        layout.addWidget(self.list_widget)
-
-        self.refresh_list_widget()
-        return screen
-
-    def create_add_screen(self):
-        screen = QWidget()
-        self.add_screen_layout = QVBoxLayout(screen)
-
-        self.error_label = QLabel()
-        self.error_label.setStyleSheet("color: red;")
-        self.error_label.hide()
-
-        back_button = self.create_button("<-", self.switch_to_search_screen, 40)
-        self.top_input = QLineEdit()
-        add_field_button = self.create_button("+", self.add_input_field, 40)
-        remove_field_button = self.create_button("-", self.remove_input_field, 40)
-        submit_button = self.create_button("Submit", self.submit_add_screen)
-        self.bottom_input = QLineEdit()
-        self.input_fields = []
-
-        self.add_screen_layout.addWidget(self.error_label)
-        self.add_screen_layout.addLayout(self.create_hbox_layout(back_button, stretch=True))
-        self.add_screen_layout.addWidget(self.top_input)
-        self.add_screen_layout.addLayout(self.create_hbox_layout(add_field_button, remove_field_button, submit_button))
-        self.add_screen_layout.addWidget(self.bottom_input)
-
-        return screen
 
     def switch_to_search_screen(self):
         self.input_screen.hide()
@@ -111,9 +47,9 @@ class PManager(QWidget):
         self.resize(512, 512)
 
         # Clear the text input fields on the add screen
-        self.top_input.clear()
-        self.bottom_input.clear()
-        for field in self.input_fields:
+        self.add_screen.top_input.clear()
+        self.add_screen.bottom_input.clear()
+        for field in self.add_screen.input_fields:
             field.clear()
 
     def switch_to_add_screen(self):
@@ -125,8 +61,8 @@ class PManager(QWidget):
         self.resize(256, 64)
 
     def submit_input_screen(self):
-        # Retrieve the PIN input
-        pin_input = self.text_input.text()
+        # Retrieve the PIN input from the input_screen instead
+        pin_input = self.input_screen.text_input.text()
 
         self.pcrypt.derive_key(pin_input)         
 
@@ -141,28 +77,28 @@ class PManager(QWidget):
 
     def submit_add_screen(self):
         # Check if either top_input or bottom_input is empty
-        if not self.top_input.text() or not self.bottom_input.text():
-            self.error_label.setText("Top or bottom input cannot be empty.")
-            self.error_label.show()
+        if not self.add_screen.top_input.text() or not self.add_screen.bottom_input.text():
+            self.add_screen.error_label.setText("Top or bottom input cannot be empty.")
+            self.add_screen.error_label.show()
             return  # Return early, do not proceed with submission
 
         # Hide the error label in case it was previously shown
-        self.error_label.hide()
+        self.add_screen.error_label.hide()
 
         # Initialize a list to hold the data from the input fields
         input_data = []
 
         # Append data from the top permanent input
-        input_data.append(self.top_input.text().lower())
+        input_data.append(self.add_screen.top_input.text().lower())
 
         # Append data from dynamically added input fields
-        for input_field in self.input_fields:
+        for input_field in self.add_screen.input_fields:
             field_data = input_field.text()
             if field_data:
                 input_data.append(field_data)
 
         # Append data from the bottom permanent input
-        input_data.append(self.bottom_input.text())
+        input_data.append(self.add_screen.bottom_input.text())
 
         # Append data to file
         self.add_service(input_data)
@@ -176,12 +112,12 @@ class PManager(QWidget):
     def add_input_field(self):
         new_input = QLineEdit()
         # Insert the new input field above the bottom input
-        self.add_screen_layout.insertWidget(self.add_screen_layout.count() - 1, new_input)
-        self.input_fields.append(new_input)
+        self.add_screen.layout.insertWidget(self.add_screen.layout.count() - 1, new_input)
+        self.add_screen.input_fields.append(new_input)
 
     def remove_input_field(self):
-        if self.input_fields:
-            input_to_remove = self.input_fields.pop()
+        if self.add_screen.input_fields:
+            input_to_remove = self.add_screen.input_fields.pop()
             input_to_remove.deleteLater()
 
     def add_service(self, data):
@@ -217,13 +153,13 @@ class PManager(QWidget):
             service_name = service_data[0]
             self.secret_data[service_name] = service_data[1:]
 
-        self.list_widget.clear()
+        self.search_screen.list_widget.clear()
 
         for service in sorted(self.secret_data.keys()):
             attributes = self.secret_data[service]
-            self.list_widget.addItem(CustomListItem('service', service))  # Add matching service
+            self.search_screen.list_widget.addItem(CustomListItem('service', service))  # Add matching service
             for attr in attributes:
-                self.list_widget.addItem(CustomListItem('attribute', '    ' + attr))  # Add masked attributes
+                self.search_screen.list_widget.addItem(CustomListItem('attribute', '    ' + attr))  # Add masked attributes
 
     def create_button(self, text, function, fixed_width=None):
         button = QPushButton(text)
@@ -232,47 +168,16 @@ class PManager(QWidget):
         button.clicked.connect(function)
         return button
 
-    def create_hbox_layout(self, *widgets, stretch=False):
-        layout = QHBoxLayout()
-        if stretch:
-            layout.addStretch(1)
-        for widget in widgets:
-            layout.addWidget(widget)
-        if stretch:
-            layout.addStretch(1)
-        return layout
-
-        super().__init__()
-        self.setWindowTitle("sdrowssap")
-        self.resize(256, 64)
-
-        # Initialize the screens
-        self.init_input_screen()
-        self.init_search_screen()
-        self.init_add_screen()
-
-        # Main layout
-        self.layout = QVBoxLayout(self)
-        self.layout.addWidget(self.input_screen)
-        self.layout.addWidget(self.search_screen)
-        self.layout.addWidget(self.add_screen)
-
-        
-
-        # Initially hide the search and add screens
-        self.search_screen.hide()
-        self.add_screen.hide()
-
     def search(self):
-        search_text = self.search_input.text().lower()
-        self.list_widget.clear()  # Clear current list
+        search_text = self.search_screen.search_input.text().lower()
+        self.search_screen.list_widget.clear()  # Clear current list
 
         for service in sorted(self.secret_data.keys()):
             if search_text in service.lower():  # Check if search text is in service
                 attributes = self.secret_data[service]
-                self.list_widget.addItem(CustomListItem('service', service))  # Add matching service
+                self.search_screen.list_widget.addItem(CustomListItem('service', service))  # Add matching service
                 for attr in attributes:
-                    self.list_widget.addItem(CustomListItem('attribute', '    ' + attr))  # Add masked attributes
+                    self.search_screen.list_widget.addItem(CustomListItem('attribute', '    ' + attr))  # Add masked attributes
 
     def import_from_file(self):
         # Open file dialog and get the selected file path
@@ -297,7 +202,7 @@ class PManager(QWidget):
 
                 self.imported = True
 
-                self.import_label.setText('Choose a master password to access and store all of your passwords.\nPlease write this password down somewhere and don\'t lose it.')
+                self.input_screen.import_label.setText('Choose a master password to access and store all of your passwords.\nPlease write this password down somewhere and don\'t lose it.')
 
                 self.imported_data = data
 
