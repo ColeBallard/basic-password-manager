@@ -1,8 +1,11 @@
 import os
 
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QLabel, QFileDialog
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QFileDialog, QListWidgetItem
+from PyQt5.QtCore import QTimer
 
-from custom_list import CustomListWidget, CustomListItem
+from widgets.custom_list import CustomListWidget, CustomListItem
+from widgets.service_item_widget import ServiceItemWidget
+from components.attribute_value_input import AttributeValueInput
 from pcrypt import PCrypt
 from screens.input_screen import InputScreen
 from screens.search_screen import SearchScreen
@@ -20,6 +23,7 @@ class PManager(QWidget):
         self.imported_data = None
 
         self.secret_data = {}
+        self.editing_service = None
 
         self.pcrypt = PCrypt(None)
 
@@ -28,7 +32,7 @@ class PManager(QWidget):
     def init_ui(self):
         self.input_screen = InputScreen(self.submit_input_screen, self.import_from_file)
         self.search_screen = SearchScreen(self.switch_to_add_screen, self.search)
-        self.add_screen = AddScreen(self.switch_to_search_screen, self.submit_add_screen, self.add_input_field, self.remove_input_field)
+        self.add_screen = AddScreen(self.switch_to_search_screen, self.submit_add_screen)
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.input_screen)
@@ -43,14 +47,26 @@ class PManager(QWidget):
         self.search_screen.show()
         self.add_screen.hide()
 
-        # Resize the window if necessary
-        self.resize(512, 512)
+        self.adjustSize()
 
         # Clear the text input fields on the add screen
-        self.add_screen.top_input.clear()
-        self.add_screen.bottom_input.clear()
-        for field in self.add_screen.input_fields:
-            field.clear()
+        self.add_screen.clear_fields()
+
+        # Add a small delay to let the list widget calculate its contents
+        QTimer.singleShot(100, self.adjust_window_width)
+
+    def adjust_window_width(self):
+        # Calculate the width needed for the list widget
+        list_width = self.search_screen.list_widget.sizeHintForColumn(0) + 80  # Add padding
+        
+        # Get the current window size
+        current_size = self.size()
+        
+        # Set a minimum width (prevents too narrow windows)
+        min_width = max(300, list_width)
+        
+        # Resize the window with the new width but keep the current height
+        self.resize(min_width, current_size.height())
 
     def switch_to_add_screen(self):
         self.input_screen.hide()
@@ -76,29 +92,35 @@ class PManager(QWidget):
         self.switch_to_search_screen()
 
     def submit_add_screen(self):
-        # Check if either top_input or bottom_input is empty
-        if not self.add_screen.top_input.text() or not self.add_screen.bottom_input.text():
-            self.add_screen.error_label.setText("Top or bottom input cannot be empty.")
+        # Initialize a list to hold the data from the input fields
+        input_data = []
+
+        if not self.add_screen.service_name_input.text():
+            self.add_screen.error_label.setText("Service name cannot be empty.")
             self.add_screen.error_label.show()
             return  # Return early, do not proceed with submission
+        else:
+            input_data.append(self.add_screen.service_name_input.text().lower())
+        
+        # Hide the error label in case it was previously shown
+        self.add_screen.error_label.hide()
+
+        for field in self.add_screen.input_fields:
+            if not field.has_text():
+                self.add_screen.error_label.setText("Cannot have empty fields.")
+                self.add_screen.error_label.show()
+                return  # Return early, do not proceed with submission
+            else:
+                input_data.append(field.get_text())
 
         # Hide the error label in case it was previously shown
         self.add_screen.error_label.hide()
 
-        # Initialize a list to hold the data from the input fields
-        input_data = []
-
-        # Append data from the top permanent input
-        input_data.append(self.add_screen.top_input.text().lower())
-
-        # Append data from dynamically added input fields
-        for input_field in self.add_screen.input_fields:
-            field_data = input_field.text()
-            if field_data:
-                input_data.append(field_data)
-
-        # Append data from the bottom permanent input
-        input_data.append(self.add_screen.bottom_input.text())
+        # If we're editing an existing service, remove the old one first
+        if hasattr(self, 'editing_service') and self.editing_service:
+            del self.secret_data[self.editing_service]
+            self.write_all_services()  # Save current data minus the old one
+            self.editing_service = None
 
         # Append data to file
         self.add_service(input_data)
@@ -108,17 +130,6 @@ class PManager(QWidget):
 
         # Switch back to the search screen
         self.switch_to_search_screen()
-
-    def add_input_field(self):
-        new_input = QLineEdit()
-        # Insert the new input field above the bottom input
-        self.add_screen.layout.insertWidget(self.add_screen.layout.count() - 1, new_input)
-        self.add_screen.input_fields.append(new_input)
-
-    def remove_input_field(self):
-        if self.add_screen.input_fields:
-            input_to_remove = self.add_screen.input_fields.pop()
-            input_to_remove.deleteLater()
 
     def add_service(self, data):
         # Encrypt the data
@@ -135,6 +146,31 @@ class PManager(QWidget):
                     file.write(encrypted_data[0] + ':' + encrypted_data[1])  # Adding the first password to the file
                 else:
                     file.write(';' + encrypted_data[0] + ':' + encrypted_data[1])  # Adding the remaining passwords to the file
+
+    def edit_service(self, service_name):
+        self.editing_service = service_name
+        self.switch_to_add_screen()
+
+        # Prefill service name
+        self.add_screen.service_name_input.setText(service_name)
+
+        # Clear current input fields
+        for field in self.add_screen.input_fields:
+            field.setParent(None)
+        self.add_screen.input_fields.clear()
+
+        # Add inputs for each field
+        for attr in self.secret_data[service_name]:
+            attr_val = attr.split(':', 1)
+            input_widget = AttributeValueInput()
+            if len(attr_val) == 2:
+                input_widget.attribute_input.setText(attr_val[0].strip())
+                input_widget.value_input.setText(attr_val[1].strip())
+            self.add_screen.layout.addWidget(input_widget)
+            self.add_screen.input_fields.append(input_widget)
+
+    def custom_key(self, char):
+        return (char.upper(), 0 if char.isupper() else 1)
 
     def refresh_list_widget(self):
         if not self.pcrypt.key:
@@ -155,9 +191,17 @@ class PManager(QWidget):
 
         self.search_screen.list_widget.clear()
 
-        for service in sorted(self.secret_data.keys()):
+        for service in sorted(self.secret_data.keys(), key=self.custom_key):
             attributes = self.secret_data[service]
-            self.search_screen.list_widget.addItem(CustomListItem('service', service))  # Add matching service
+
+            # Inside refresh_list_widget()
+            item_widget = ServiceItemWidget(service, self.edit_service)
+            list_item = QListWidgetItem()
+            list_item.setSizeHint(item_widget.sizeHint())
+
+            self.search_screen.list_widget.addItem(list_item)
+            self.search_screen.list_widget.setItemWidget(list_item, item_widget)
+            # Add matching service
             for attr in attributes:
                 self.search_screen.list_widget.addItem(CustomListItem('attribute', '    ' + attr))  # Add masked attributes
 
@@ -172,12 +216,26 @@ class PManager(QWidget):
         search_text = self.search_screen.search_input.text().lower()
         self.search_screen.list_widget.clear()  # Clear current list
 
-        for service in sorted(self.secret_data.keys()):
+        for service in sorted(self.secret_data.keys(), key=self.custom_key):
             if search_text in service.lower():  # Check if search text is in service
                 attributes = self.secret_data[service]
-                self.search_screen.list_widget.addItem(CustomListItem('service', service))  # Add matching service
+                item_widget = ServiceItemWidget(service, self.edit_service)
+                list_item = QListWidgetItem()
+                list_item.setSizeHint(item_widget.sizeHint())
+
+                self.search_screen.list_widget.addItem(list_item)
+                self.search_screen.list_widget.setItemWidget(list_item, item_widget)
                 for attr in attributes:
                     self.search_screen.list_widget.addItem(CustomListItem('attribute', '    ' + attr))  # Add masked attributes
+
+    def write_all_services(self):
+        with open(self.FILE_PATH, 'w') as file:
+            all_entries = []
+            for service, attributes in self.secret_data.items():
+                plain = '\n'.join([service] + attributes)
+                enc = self.pcrypt.encrypt_data(plain)
+                all_entries.append(enc[0] + ':' + enc[1])
+            file.write(';'.join(all_entries))
 
     def import_from_file(self):
         # Open file dialog and get the selected file path
