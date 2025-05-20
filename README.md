@@ -7,7 +7,7 @@ Basic password management tool for storing and retrieving encrypted passwords.
 ## Features
 
 - simple window UI (User Interface) that hides password values
-- add and search for passwords
+- add, edit, and search for passwords
 - automatically add passwords to clipboard by clicking on the designated row in the password list
 - import text file of passwords
 - encryption using AES (Advanced Encryption Standard) based on master user passcode
@@ -16,31 +16,65 @@ Basic password management tool for storing and retrieving encrypted passwords.
 
 To install and use this app:
 
-1. Navigate to the [Releases page](https://github.com/ColeBallard/basic-password-manager/releases) of this repository.
+1. Clone the repository.
 
-2. Under the latest release, find the section **Assets**.
+```shell
+git clone https://github.com/ColeBallard/basic-password-manager.git
+```
 
-3. Click on the **sdrowssap.zip** file to download it to your computer.
+2. Download [Python 3.12](https://www.python.org/downloads/). (Other versions will likely work fine).
 
-4. Extract the contents of **sdrowssap.zip** by right-clicking on the file and selecting **Extract All...**.
+3. Create the Virtual Environment.
 
-5. Open the extracted folder and run **main.exe**.
+```shell
+python -m venv venv
+```
 
-6. From here, either import your data or add each service individually.
+4. Activate the Virtual Environment.
 
-7. To add each service individually, enter a master password in the text box of the first window and press Go. 
+Windows (Command Prompt):
 
-8. The next window will have a list of your passwords. 
+```shell
+venv\Scripts\activate
+```
 
-9. To add a new service, press the Add button. Click the <- button to go back to the list, the + button to add an attribute, and the - button to remove an attribute.
+Windows (PowerShell):
 
-10. In the top text box, write your service. In the bottom text boxes, write your attributes and values in the format `attribute : value`.
+```shell
+venv\Scripts\Activate.ps1
+```
 
-11. Click submit once you've finished creating your service and all your attribute/values.
+macOS/Linux:
 
-12. In the text box above the Search button, type in the service you want to find and press the Search button.
+```shell
+source venv/bin/activate
+```
 
-13. To copy the value to your clipboard, click the row where the attribute and value is at.
+5. Install the requirements.
+
+```shell
+pip install -r requirements.txt
+```
+
+6. Run the app.
+
+```shell
+python sdrowssap.py
+```
+
+7. Create an executable and move it to your desired location.
+
+```shell
+pyinstaller sdrowssap.spec
+```
+
+8. Run the app.
+
+```shell
+sdrowssap.exe
+```
+
+8. Either import a text file of passwords or create a new one by 
 
 ## Import Text File
 
@@ -81,14 +115,10 @@ attribute - value
 - button to let user change master passcode
   - maintains file with old passcode by duplicating encrypted text file with timestamp
 - button to let user export into a decrypted text file
-- button to let user edit a service/attribute/value
-- when adding a service, split the attribute/value text box into 2 text boxes and automatically create the ' : ' between them
 - more advanced searching
   - possibly search by attribute name
 - sort by date
 - ensuring uniform font for all text input
-- better labeling for all text inputs
-  - possibly use placeholders
 - better ui
   - better button layout and space usage
   - might experiment with using toolbar for all buttons

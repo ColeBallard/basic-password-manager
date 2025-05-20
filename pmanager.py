@@ -1,11 +1,11 @@
 import os
 
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QFileDialog, QListWidgetItem
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QFileDialog, QListWidgetItem, QMessageBox
 from PyQt5.QtCore import QTimer
 
 from widgets.custom_list import CustomListWidget, CustomListItem
 from widgets.service_item_widget import ServiceItemWidget
-from components.attribute_value_input import AttributeValueInput
+from widgets.attribute_value_input import AttributeValueInput
 from pcrypt import PCrypt
 from screens.input_screen import InputScreen
 from screens.search_screen import SearchScreen
@@ -176,9 +176,22 @@ class PManager(QWidget):
         if not self.pcrypt.key:
             return
 
-        # Read encrypted data from the file
-        with open(self.FILE_PATH, 'r') as file:
-            encrypted_data = file.read()
+        # Read encrypted data from the file, create if it doesn't exist
+        try:
+            with open(self.FILE_PATH, 'r') as file:
+                encrypted_data = file.read()
+        except FileNotFoundError:
+            pin = self.input_screen.text_input.text()
+            QMessageBox.warning(
+                self,
+                "New Password File Created",
+                f"Your master password is: {pin}\n\nPlease write this down and keep it secure. "
+                "If you lose this password, you will not be able to access your stored data."
+            )
+            # Create empty file if it doesn't exist
+            with open(self.FILE_PATH, 'w') as file:
+                pass
+            encrypted_data = ''
 
         if encrypted_data == '':
             return

@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QPushButton, QLabel
 from widgets.custom_layouts import create_hbox_layout
-from components.attribute_value_input import AttributeValueInput
+from widgets.attribute_value_input import AttributeValueInput
 
 class AddScreen(QWidget):
     def __init__(self, back_callback, submit_callback):
