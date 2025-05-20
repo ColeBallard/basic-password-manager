@@ -74,7 +74,7 @@ pyinstaller sdrowssap.spec
 sdrowssap.exe
 ```
 
-8. Either import a text file of passwords or create a new one by 
+9. Either import a text file of passwords or create a new one by entering in a master password in the text box and pressing Go.
 
 ## Import Text File
 
